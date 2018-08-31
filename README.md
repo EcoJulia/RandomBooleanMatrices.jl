@@ -1,6 +1,6 @@
 # RandomBooleanMatrices
 
-[Status](https://travis-ci.org/EcoJulia/SpatialEcology.jl.svg?branch=master)](https://travis-ci.org/EcoJulia/SpatialEcology.jl)
+[![Build Status](https://travis-ci.org/EcoJulia/SpatialEcology.jl.svg?branch=master)](https://travis-ci.org/EcoJulia/SpatialEcology.jl)
 
 ### Work In Progress for a scientific publication
 
