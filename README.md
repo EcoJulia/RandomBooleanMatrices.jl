@@ -1,6 +1,6 @@
 # RandomBooleanMatrices
 Create random boolean matrices that maintain row and column sums. This is a very common use case for null models in ecology.
-The package offers the newest and most efficient unbiased algorithms for generating random matrices. Legacy approaches have 
+Status](https://travis-ci.org/EcoJulia/SpatialEcology.jl.svg?branch=master)](https://travis-ci.org/EcoJulia/SpatialEcology.jl)
 used different forms of swapping, or some alternative approaches like the `quasiswap` algorithm in R's vegan package. These
 methods are neither efficient, nor are they guaranteed to sample the possible distribution of boolean vectors with a given row
 and column sum equally.
