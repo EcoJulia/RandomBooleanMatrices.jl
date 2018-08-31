@@ -29,6 +29,8 @@ end
 
 function _curveball!(m::SparseMatrixCSC{Bool, Int})
    R, C = size(m)
+   mcs = maximum(sum(m, dims = 1))
+   uniques, shared = Array{Int}(mcs), Array{Bool}(mcs)
 
    for rep ∈ 1:5C
 	   A, B = rand(1:C,2)
@@ -38,7 +40,7 @@ function _curveball!(m::SparseMatrixCSC{Bool, Int})
 	   l_a, l_b = length(a), length(b)
 
       # an efficient algorithm since both a and b are sorted
-      shared, not_shared = _interdif(a, b)
+      nunique, l_ab = _interdif!(a, b, uniques, shared)
 	   l_ab = length(shared)
 
 	   if !(l_ab ∈ (l_a, l_b))
