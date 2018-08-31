@@ -1,4 +1,7 @@
-using SparseArrays, RandomBooleanMatrices, Random
+using RandomBooleanMatrices
+using SparseArrays
+using Random
+using Test
 
 Random.seed!(1337)
 
