@@ -38,12 +38,13 @@ random2 = rmg()
 ``
 """
 random_matrices(m::AbstractMatrix; method::matrixrandomizations = curveball) =
-    MatrixGenerator(m, method = method) #for this case there's an implicit `copy` already
+    MatrixGenerator(m, method) #for this case there's an implicit `copy` already
 random_matrices(m::SparseMatrixCSC{Bool, Int}; method::matrixrandomizations = curveball) =
-    MatrixGenerator(copy(m), method = method)
+    MatrixGenerator(copy(m), method)
+
 (r::MatrixGenerator)(; method::matrixrandomizations = curveball) = copy(randomize_matrix!(r.m, method = r.method))
 
 export randomize_matrix!, random_matrices
+export curveball
 
-export randomize_matrix, random_matrices, matrixrandomizations
 end
