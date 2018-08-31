@@ -2,6 +2,8 @@
 
 Status](https://travis-ci.org/EcoJulia/SpatialEcology.jl.svg?branch=master)](https://travis-ci.org/EcoJulia/SpatialEcology.jl)
 
+### Work In Progress for a scientific publication
+
 Create random boolean matrices that maintain row and column sums. This is a very
 common use case for null models in ecology.
 
