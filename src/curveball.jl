@@ -37,7 +37,7 @@ function _curveball!(m::SparseMatrixCSC{Bool, Int})
       # use views directly into the sparse matrix to avoid copying
 	   a, b = view(m.rowval, m.colptr[A]:m.colptr[A+1]-1), view(m.rowval, m.colptr[B]:m.colptr[B+1]-1)
 	   l_a, l_b = length(a), length(b)
-      
+
       # an efficient algorithm since both a and b are sorted
       shared, not_shared = _interdif(a, b)
 	   l_ab = length(shared)
@@ -50,5 +50,5 @@ function _curveball!(m::SparseMatrixCSC{Bool, Int})
 	   end
    end
 
-   m
+   return m
 end
