@@ -18,7 +18,7 @@ end
 
 struct MatrixGenerator
     m::SparseMatrixCSC{Bool, Int}
-    method::methods
+    method::matrixrandomizations
 end
 
 """
