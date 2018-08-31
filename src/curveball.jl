@@ -1,4 +1,3 @@
-using Random, SparseArrays
 
 function _interdif(v1, v2)
    inter, dif = Int[], Int[]

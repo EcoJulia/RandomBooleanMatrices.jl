@@ -1,5 +1,7 @@
 module RandomBooleanMatrices
 
+using Random
+using SparseArrays
 include("curveball.jl")
 
 @enum matrixrandomizations curveball
