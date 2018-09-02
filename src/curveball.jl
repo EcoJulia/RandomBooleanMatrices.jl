@@ -27,13 +27,13 @@ function _interdif(v1, v2)
    inter, dif
 end
 
-function _curveball!(m::SparseMatrixCSC{Bool, Int})
+function _curveball!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG)
    R, C = size(m)
    mcs = maximum(sum(m, dims = 1))
    uniques, shared = Array{Int}(mcs), Array{Bool}(mcs)
 
    for rep ∈ 1:5C
-	   A, B = rand(1:C,2)
+	   A, B = rand(rng, 1:C,2)
 
       # use views directly into the sparse matrix to avoid copying
 	   a, b = view(m.rowval, m.colptr[A]:m.colptr[A+1]-1), view(m.rowval, m.colptr[B]:m.colptr[B+1]-1)
