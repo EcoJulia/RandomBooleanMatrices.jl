@@ -3,6 +3,8 @@ module RandomBooleanMatrices
 using Random
 using RandomNumbers.Xorshifts
 using SparseArrays
+using StatsBase
+
 include("curveball.jl")
 
 @enum matrixrandomizations curveball
