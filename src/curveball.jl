@@ -2,6 +2,29 @@
 function sortmerge!(v1, v2, ret, iend, jend)
    retind = 0
    i,j = firstindex(v1), firstindex(v2)
+   @inbounds while i <= iend || j <= jend
+      if j > jend
+         ret[retind += 1] = v1[i]
+         i+=1
+         continue
+      elseif i > iend
+         ret[retind += 1] = v2[j]
+         j+=1
+         continue
+      end
+      if v1[i] == v2[j]
+         error("The two vectors are not supposed to have overlapping values")
+      elseif j > lastindex(v2) || v1[i] < v2[j]
+         ret[retind += 1] = v1[i]
+         i+=1
+      elseif i > lastindex(v1) || v1[i] > v2[j]
+         ret[retind += 1] = v2[j]
+         j+=1
+      end
+   end
+end
+
+
 function _interdif!(v1, v2, inter, dif)
    nshared, ndiff = 0, 0
    i,j = firstindex(v1), firstindex(v2)
@@ -50,6 +73,8 @@ function _curveball!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG)
 			   L     = l_a - l_ab
 			   sample!(rng, not_shared, view(newa,1:L), replace = false, ordered = true)
 			   b .= sort!([shared; not_shared[L+1:end]])
+			   sortmerge!(shared, newa, a, l_ab, L)
+			   sortmerge!(shared, newb, b, l_ab, L2)
 	   end
    end
 
