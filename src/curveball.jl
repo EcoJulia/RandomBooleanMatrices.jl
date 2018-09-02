@@ -55,8 +55,9 @@ end
 
 function _curveball!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG)
    R, C = size(m)
-   mcs = maximum(sum(m, dims = 1))
-   uniques, shared = Array{Int}(mcs), Array{Bool}(mcs)
+   mcs = min(2maximum(diff(m.colptr)), size(m, 1))
+   not_shared, shared = Vector{Int}(undef, mcs), Vector{Int}(undef, mcs)
+   newa, newb = Vector{Int}(undef, mcs), Vector{Int}(undef, mcs)
 
    for rep ∈ 1:5C
 	   A, B = rand(rng, 1:C,2)
@@ -72,7 +73,8 @@ function _curveball!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG)
             L = l_a - l_ab
             resize!(not_shared, l_dif)
 			   sample!(rng, not_shared, view(newa,1:L), replace = false, ordered = true)
-			   b .= sort!([shared; not_shared[L+1:end]])
+            L2,_ = _interdif!(view(newa, 1:L), not_shared, newa, newb)
+
 			   sortmerge!(shared, newa, a, l_ab, L)
 			   sortmerge!(shared, newb, b, l_ab, L2)
 	   end
