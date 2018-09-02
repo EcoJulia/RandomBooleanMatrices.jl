@@ -69,8 +69,8 @@ function _curveball!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG)
       l_dif, l_ab = _interdif!(a, b, shared, not_shared)
 
 	   if !(l_ab ∈ (l_a, l_b))
-			   shuffle!(not_shared)
-			   L     = l_a - l_ab
+            L = l_a - l_ab
+            resize!(not_shared, l_dif)
 			   sample!(rng, not_shared, view(newa,1:L), replace = false, ordered = true)
 			   b .= sort!([shared; not_shared[L+1:end]])
 			   sortmerge!(shared, newa, a, l_ab, L)
