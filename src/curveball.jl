@@ -1,30 +1,33 @@
 
-function _interdif(v1, v2)
-   inter, dif = Int[], Int[]
+function sortmerge!(v1, v2, ret, iend, jend)
+   retind = 0
+   i,j = firstindex(v1), firstindex(v2)
+function _interdif!(v1, v2, inter, dif)
+   nshared, ndiff = 0, 0
    i,j = firstindex(v1), firstindex(v2)
    @inbounds while i <= lastindex(v1) || j <= lastindex(v2)
       if j > lastindex(v2)
-         push!(dif, v1[i])
+         dif[ndiff += 1] = v1[i]
          i+=1
          continue
       elseif i > lastindex(v1)
-         push!(dif, v2[j])
+         dif[ndiff += 1] = v2[j]
          j+=1
          continue
       end
       if v1[i] == v2[j]
-         push!(inter, v1[i])
+         inter[nshared += 1] = v1[i]
          i += 1
          j += 1
       elseif j > lastindex(v2) || v1[i] < v2[j]
-         push!(dif, v1[i])
+         dif[ndiff += 1] = v1[i]
          i+=1
       elseif i > lastindex(v1) || v1[i] > v2[j]
-         push!(dif, v2[j])
+         dif[ndiff += 1] = v2[j]
          j+=1
       end
    end
-   inter, dif
+   ndiff, nshared
 end
 
 function _curveball!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG)
@@ -40,8 +43,7 @@ function _curveball!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG)
 	   l_a, l_b = length(a), length(b)
 
       # an efficient algorithm since both a and b are sorted
-      nunique, l_ab = _interdif!(a, b, uniques, shared)
-	   l_ab = length(shared)
+      l_dif, l_ab = _interdif!(a, b, shared, not_shared)
 
 	   if !(l_ab ∈ (l_a, l_b))
 			   shuffle!(not_shared)
