@@ -66,6 +66,7 @@ function _curveball!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG)
 	   a, b = view(m.rowval, m.colptr[A]:m.colptr[A+1]-1), view(m.rowval, m.colptr[B]:m.colptr[B+1]-1)
 	   l_a, l_b = length(a), length(b)
 
+      resize!(not_shared, l_a + l_b)
       # an efficient algorithm since both a and b are sorted
       l_dif, l_ab = _interdif!(a, b, shared, not_shared)
 
