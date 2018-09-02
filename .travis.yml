@@ -16,4 +16,4 @@ matrix:
  - julia: nightly
 
 script:
-  - julia -e 'import Pkg; Pkg.add("https://github.com/EcoJulia/RandomBooleanMatrices.jl"); Pkg.build("RandomBooleanMatrices"); Pkg.test("RandomBooleanMatrices")'
+  - julia -e 'import Pkg; Pkg.add(pwd()); Pkg.build("RandomBooleanMatrices"); Pkg.test("RandomBooleanMatrices")'
