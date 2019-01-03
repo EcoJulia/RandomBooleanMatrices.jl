@@ -24,11 +24,15 @@ using SparseArrays, RandomBooleanMatrices
 m = sprand(Bool, 1000, 1000, 0.1)
 randomize_matrix!(m)
 
-# genenrator
+# using a Matrix generator object
 m = sprand(Bool, 1000, 1000, 0.1)
-rmg = random_matrices(m)
-m1 = rmg() # creates a new random matrix
-m2 = rmg()
+rmg = matrixgenerator(m)
+m1 = rand(rmg) # creates a new random matrix
+m2 = rand(rmg)
+
+# You can also avoid copying by
+m3 = rand!(rmg)
+# but notice that this will not create a new copy of the Matrix, so generating multiple matrices at once with this is impossible
 ```
 
 ### References

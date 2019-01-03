@@ -14,7 +14,7 @@ include("curveball.jl")
 
 Randomize the sparse boolean Matrix `m` while maintaining row and column sums
 """
-function randomize_matrix!(m, rng = Random.GLOBAL_RNG; method::matrixrandomizations = curveball)
+function randomize_matrix!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG; method::matrixrandomizations = curveball)
     if method == curveball
         return _curveball!(m, rng)
     end
@@ -28,7 +28,7 @@ struct MatrixGenerator{R<:AbstractRNG}
 end
 
 """
-    random_matrices(m [,rng]; method = curveball)
+    matrixgenerator(m [,rng]; method = curveball)
 
 Create a matrix generator function that will return a random boolean matrix
 every time it is called, maintaining row and column sums. Non-boolean input
@@ -37,20 +37,21 @@ matrix are interpreted as boolean, where values != 0 are `true`.
 # Examples
 ```
 m = rand(0:4, 5, 6)
-rmg = random_matrices(m)
+rmg = matrixgenerator(m)
 
 random1 = rmg()
 random2 = rmg()
 ``
 """
-random_matrices(m::AbstractMatrix, rng = Xoroshiro128Plus(); method::matrixrandomizations = curveball) =
+matrixgenerator(m::AbstractMatrix, rng = Xoroshiro128Plus(); method::matrixrandomizations = curveball) =
     MatrixGenerator{typeof(rng)}(dropzeros!(sparse(m)), method, rng)
-random_matrices(m::SparseMatrixCSC{Bool, Int}, rng = Xoroshiro128Plus(); method::matrixrandomizations = curveball) =
+matrixgenerator(m::SparseMatrixCSC{Bool, Int}, rng = Xoroshiro128Plus(); method::matrixrandomizations = curveball) =
     MatrixGenerator{typeof(rng)}(dropzeros(m), method, rng)
 
-(r::MatrixGenerator)(; method::matrixrandomizations = curveball) = copy(randomize_matrix!(r.m, r.rng, method = r.method))
+Random.rand(r::MatrixGenerator; method::matrixrandomizations = curveball) = copy(randomize_matrix!(r.m, r.rng, method = r.method))
+Random.rand!(r::MatrixGenerator; method::matrixrandomizations = curveball) = randomize_matrix!(r.m, r.rng, method = r.method)
 
-export randomize_matrix!, random_matrices
+export randomize_matrix!, matrixgenerator
 export curveball
 
 end
