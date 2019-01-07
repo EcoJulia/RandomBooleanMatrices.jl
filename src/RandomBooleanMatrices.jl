@@ -27,6 +27,8 @@ struct MatrixGenerator{R<:AbstractRNG}
     rng::R
 end
 
+show(io::IO, m::MatrixGenerator) = println(io, "Boolean MatrixGenerator with size $(size(m.m)) and $(nnz(m.m)) occurrences")
+
 """
     matrixgenerator(m [,rng]; method = curveball)
 
