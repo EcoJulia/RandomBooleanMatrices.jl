@@ -21,13 +21,16 @@ function randomize_matrix!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RN
     error("undefined method")
 end
 
-struct MatrixGenerator{R<:AbstractRNG}
-    m::SparseMatrixCSC{Bool, Int}
+
+SparseMatrixCSC{Bool, Int}
+
+struct MatrixGenerator{R<:AbstractRNG, M}
+    m::M
     method::matrixrandomizations
     rng::R
 end
 
-show(io::IO, m::MatrixGenerator) = println(io, "Boolean MatrixGenerator with size $(size(m.m)) and $(nnz(m.m)) occurrences")
+show(io::IO, m::MatrixGenerator{R, SparseMatrixCSC{Bool, Int}}) where R = println(io, "Boolean MatrixGenerator with size $(size(m.m)) and $(nnz(m.m)) occurrences")
 
 """
     matrixrandomizer(m [,rng]; method = curveball)
@@ -52,8 +55,8 @@ matrixrandomizer(m::AbstractMatrix, rng = Xoroshiro128Plus(); method::matrixrand
 matrixrandomizer(m::SparseMatrixCSC{Bool, Int}, rng = Xoroshiro128Plus(); method::matrixrandomizations = curveball) =
     MatrixGenerator{typeof(rng), SparseMatrixCSC{Bool, Int}}(dropzeros(m), method, rng)
 
-Random.rand(r::MatrixGenerator; method::matrixrandomizations = curveball) = copy(randomize_matrix!(r.m, r.rng, method = r.method))
-Random.rand!(r::MatrixGenerator; method::matrixrandomizations = curveball) = randomize_matrix!(r.m, r.rng, method = r.method)
+Random.rand(r::MatrixGenerator{R, SparseMatrixCSC{Bool, Int}}; method::matrixrandomizations = curveball) where R = copy(randomize_matrix!(r.m, r.rng, method = r.method))
+Random.rand!(r::MatrixGenerator{R, SparseMatrixCSC{Bool, Int}}; method::matrixrandomizations = curveball) where R = randomize_matrix!(r.m, r.rng, method = r.method)
 
 export randomize_matrix!, matrixrandomizer, matrixrandomizations
 export curveball
