@@ -19,7 +19,7 @@ Random.seed!(1337)
     m2 = rand(0:1, 6, 5)
     rsm = sum(m2, dims = 1)
     csm = sum(m2, dims = 2)
-    rmg = matrixgenerator(m2, method = curveball)
+    rmg = matrixrandomizer(m2, method = curveball)
     m3 = rand(rmg)
 
     @test rsm == sum(m3, dims = 1)

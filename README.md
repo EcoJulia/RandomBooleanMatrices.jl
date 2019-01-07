@@ -26,7 +26,7 @@ randomize_matrix!(m)
 
 # using a Matrix generator object
 m = sprand(Bool, 1000, 1000, 0.1)
-rmg = matrixgenerator(m)
+rmg = matrixrandomizer(m)
 m1 = rand(rmg) # creates a new random matrix
 m2 = rand(rmg)
 
