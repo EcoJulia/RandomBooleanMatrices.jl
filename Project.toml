@@ -5,12 +5,16 @@ authors = ["mkborregaard <mkborregaard@snm.ku.dk"]
 version = "0.1.2"
 
 [deps]
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 RandomNumbers = "e6cf234a-135c-5ec9-84dd-332b85af5143"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
 julia = "1"
+Random = "1"
 RandomNumbers = "1"
+SparseArrays = "1"
 StatsBase = "0.33, 0.34"
 
 [extras]
