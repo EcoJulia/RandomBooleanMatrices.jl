@@ -1,8 +1,8 @@
 # RandomBooleanMatrices
 
-[![Build Status](https://travis-ci.org/EcoJulia/RandomBooleanMatrices.jl.svg?branch=master)](https://travis-ci.org/EcoJulia/RandomBooleanMatrices.jl)
+[![codecov](https://codecov.io/gh/EcoJulia/RandomBooleanMatrices.jl/graph/badge.svg?token=XdZckrNGI9)](https://app.codecov.io/gh/EcoJulia/RandomBooleanMatrices.jl)
 
-### Work In Progress for a scientific publication
+## Work In Progress for a scientific publication
 
 Create random boolean matrices that maintain row and column sums. This is a very
 common use case for null models in ecology.
@@ -35,7 +35,8 @@ m3 = rand!(rmg)
 # but notice that this will not create a new copy of the Matrix, so generating multiple matrices at once with this is impossible
 ```
 
-### References
+## References
+
 Strona, G., Nappo, D., Boccacci, F., Fattorini, S. & San-Miguel-Ayanz, J. (2014)
 A fast and unbiased procedure to randomize ecological binary matrices with fixed row and column totals.
 Nature Communications, 5, 4114.
