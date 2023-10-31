@@ -9,7 +9,7 @@ RandomNumbers = "e6cf234a-135c-5ec9-84dd-332b85af5143"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
-Julia = "1"
+julia = "1"
 RandomNumbers = "1"
 StatsBase = "0.33, 0.34"
 
