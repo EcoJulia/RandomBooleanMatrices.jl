@@ -39,20 +39,25 @@ m3 = rand!(rmg)
 ## Methods
 
   * `curveball` (default) — the curveball algorithm of Strona et al. (2014). A
-    fast in-place trade that performs a Markov step from the current matrix;
-    repeated calls walk over the space of fixed-margin matrices.
+    fast in-place trade that performs a Markov step from the current matrix. It is
+    **sequential**: each call modifies the matrix in place and continues the chain
+    from where the previous call left off, so successive draws are *correlated*.
+    The chain's stationary distribution is the uniform one, so over a long run
+    (with a little burn-in / thinning) it samples fixed-margin matrices uniformly.
   * `sis` — sequential importance sampling (Harrison & Miller 2013). Each call
-    draws an *independent* matrix from a fast, near-uniform approximation of the
+    draws an **independent** matrix from a fast, near-uniform approximation of the
     fixed-margin distribution. Scales to large matrices and is the natural choice
     when independent draws are wanted.
-  * `exact` — exact uniform sampling (Miller & Harrison 2013). Draws independent,
-    *exactly* uniform matrices, and is feasible for small matrices (roughly
-    `rows + cols ≤ 100`, or very sparse). The matrix count is computed once by
-    `matrixrandomizer` and reused by every `rand`, so the generator form is much
-    cheaper than `randomize_matrix!(m, method = exact)` for repeated sampling.
+  * `exact` — exact uniform sampling (Miller & Harrison 2013). Each call draws an
+    **independent**, *exactly* uniform matrix, and is feasible for small matrices
+    (roughly `rows + cols ≤ 100`, or very sparse). The matrix count is computed
+    once by `matrixrandomizer` and reused by every `rand`, so the generator form
+    is much cheaper than `randomize_matrix!(m, method = exact)` for repeated
+    sampling.
 
-The `exact` and `sis` methods are uniform over (resp. close to uniform over) all
-binary matrices with the given margins. The `sis` proposal is the uniform special
+In short: `curveball` is a sequential Markov chain (correlated draws, uniform in
+the limit), while `exact` and `sis` produce independent draws (exactly uniform,
+resp. close to uniform) on every call. The `sis` proposal is the uniform special
 case of the importance sampler of Harrison & Miller; non-uniform (weighted)
 sampling is a planned extension.
 
