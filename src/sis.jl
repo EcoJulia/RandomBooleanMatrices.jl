@@ -76,6 +76,7 @@ and kept in descending `order`; columns are summarised by their `conjugate`
 mutable struct SISResidual
    residual::Vector{Int}    # residual row sums, indexed by original row
    order::Vector{Int}       # original row indices, sorted by descending residual
+   pos::Vector{Int}         # inverse of `order`: where each row sits within it
    conjugate::Vector{Int}   # conjugate of the columns not yet sampled
    total::Int               # ones still to place
    sumsq::Int               # Σ colsum² over columns not yet sampled
@@ -85,8 +86,8 @@ end
 
 function SISResidual(rowsums::Vector{Int}, colsums::Vector{Int})
    nrows = length(rowsums)
-   SISResidual(copy(rowsums), sortperm(rowsums, rev = true),
-               _conjugate(colsums, nrows),
+   order = sortperm(rowsums, rev = true)
+   SISResidual(copy(rowsums), order, invperm(order), _conjugate(colsums, nrows),
                sum(colsums), sum(abs2, colsums), length(colsums), nrows)
 end
 
@@ -102,12 +103,29 @@ function _advance!(res::SISResidual, k::Int)
    res
 end
 
-# Decrement the rows that received a one and restore the descending order.
+# Decrement the rows that received a one and restore the descending order. Each
+# of those rows dropped by exactly one, so it only has to slide past the block of
+# rows still holding its previous value — an O(ones placed) repair rather than a
+# full re-sort. Repairing the lowest-valued rows first keeps every swap local.
 function _place!(res::SISResidual, rows)
+   order, pos, residual = res.order, res.pos, res.residual
    @inbounds for r in rows
-      res.residual[r] -= 1
+      residual[r] -= 1
    end
-   sortperm!(res.order, res.residual, rev = true)
+   @inbounds for idx in lastindex(rows):-1:firstindex(rows)
+      r = rows[idx]
+      i = pos[r]
+      value = residual[r]
+      j = i
+      while j < res.nrows && residual[order[j+1]] > value
+         j += 1
+      end
+      if j > i
+         displaced = order[j]
+         order[i], order[j] = displaced, r
+         pos[r], pos[displaced] = j, i
+      end
+   end
    res
 end
 
@@ -172,23 +190,35 @@ function _transitions!(ws::SISWorkspace, k::Int)
    m = length(ws.p)
    gnext, gcur, S = ws.gnext, ws.gcur, ws.S
    fill!(gnext, 0.0)
+   fill!(gcur, 0.0)
    gnext[k+1] = 1.0                       # base case: all rows placed, sum == k
+   lonext, hinext = k + 1, k + 1          # index range where gnext is nonzero
+   locur, hicur = 1, 0                    # gcur is empty (all zero)
    @inbounds for i in m:-1:1
       lo = i == 1 ? 0 : ws.lo[i-1]        # band on the partial sum before row i
       hi = i == 1 ? 0 : ws.hi[i-1]
       p = ws.p[i]
-      fill!(gcur, 0.0)
+      for t in locur:hicur               # clear only gcur's stale band
+         gcur[t] = 0.0
+      end
       total = 0.0
       for s in lo:hi
-         w1 = p * gnext[s+2]              # row i is a one  -> partial sum s+1
-         w0 = (1 - p) * gnext[s+1]        # row i is a zero -> partial sum s
+         w1 = p * gnext[s+2]             # row i is a one  -> partial sum s+1
+         w0 = (1 - p) * gnext[s+1]       # row i is a zero -> partial sum s
          weight = w0 + w1
          gcur[s+1] = weight
          S[s+1, i] = weight > 0 ? w1 / weight : 0.0
          total += weight
       end
-      total > 0 && (@views gcur[lo+1:hi+1] ./= total)   # rescale to avoid underflow
+      if total > 0                       # rescale to avoid underflow
+         invtotal = inv(total)
+         for s in lo:hi
+            gcur[s+1] *= invtotal
+         end
+      end
+      locur, hicur = lo + 1, hi + 1
       gnext, gcur = gcur, gnext
+      lonext, hinext, locur, hicur = locur, hicur, lonext, hinext
    end
    ws
 end
