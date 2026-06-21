@@ -169,7 +169,7 @@ function _score!(ws::SISWorkspace, res::SISResidual, scorer::ColumnScorer,
       row = res.order[i]
       ρ = res.residual[row]
       p = scorer(ρ)
-      v = _weightfactor(model, row, ρ, res.ncols, pos)
+      v = _weightfactor(model, row, ρ, pos)
       if isinf(v)
          ws.p[i] = 1.0
          ws.one[i] = 1.0
@@ -203,7 +203,8 @@ end
 # feasibility band into forward transition probabilities. `g[s]` is the total
 # weight of feasible completions reaching column total `k` from partial sum `s`;
 # `S[s+1, i]` is the resulting probability that row `i` is a one given partial sum
-# `s` before it.
+# `s` before it. Returns `false` if the column has no feasible completion — only
+# possible when structural zeros forbid enough ones — so the caller can reject.
 function _transitions!(ws::SISWorkspace, k::Int)
    m = length(ws.p)
    gnext, gcur, S = ws.gnext, ws.gcur, ws.S
@@ -229,17 +230,16 @@ function _transitions!(ws::SISWorkspace, k::Int)
          S[s+1, i] = weight > 0 ? w1 / weight : 0.0
          total += weight
       end
-      if total > 0                       # rescale to avoid underflow
-         invtotal = inv(total)
-         for s in lo:hi
-            gcur[s+1] *= invtotal
-         end
+      total > 0 || return false          # no completion: a structural-zero dead-end
+      invtotal = inv(total)              # rescale to avoid underflow
+      for s in lo:hi
+         gcur[s+1] *= invtotal
       end
       locur, hicur = lo + 1, hi + 1
       gnext, gcur = gcur, gnext
       lonext, hinext, locur, hicur = locur, hicur, lonext, hinext
    end
-   ws
+   true
 end
 
 # Forward pass: walk the rows, drawing each from its transition probability.
@@ -269,19 +269,20 @@ end
     _sample_column!(rows, res, k, ws, model, pos, label, rng)
 
 Sample the column with label `label` (at sampling position `pos`) and total `k`
-into `rows` (original row indices), update the residual problem, and return the
-log proposal probability and log target weight `(logq, logp)` of the draw.
+into `rows` (original row indices), update the residual problem, and return
+`(logq, logp, feasible)`: the log proposal probability, the log target weight, and
+whether a completion existed (`false` is a structural-zero dead-end to reject).
 """
 function _sample_column!(rows, res::SISResidual, k::Int, ws::SISWorkspace,
                          model::WeightModel, pos::Int, label::Int, rng)
-   k == 0 && return 0.0, 0.0
+   k == 0 && return 0.0, 0.0, true
    _advance!(res, k)
    _score!(ws, res, Canfield(res.nrows, res.ncols, res.total, res.sumsq), model, pos)
    _band!(ws, res, k)
-   _transitions!(ws, k)
+   _transitions!(ws, k) || return 0.0, 0.0, false
    logq, logp = _draw_column!(rows, ws, res.order, k, model, label, rng)
    _place!(res, rows)
-   logq, logp
+   logq, logp, true
 end
 
 # ---------------------------------------------------------------------------
@@ -296,7 +297,9 @@ target described by `model` (uniform, or a [`WeightMatrix`]). Returns the row
 indices of each column with the log proposal probability `logq` and log target
 weight `logp` of the whole matrix; the importance weight of the draw is
 `exp(logp - logq)`. Columns are visited in the order the model prescribes (by
-decreasing sum), which the authors find improves the approximation.
+decreasing sum), which the authors find improves the approximation. With
+structural zeros a draw can dead-end; it is returned with `logq = Inf` so that its
+importance weight `exp(logp - logq)` is zero.
 """
 function _sis(rowsums::Vector{Int}, colsums::Vector{Int}, model::WeightModel, rng)
    res = SISResidual(rowsums, colsums)
@@ -305,7 +308,8 @@ function _sis(rowsums::Vector{Int}, colsums::Vector{Int}, model::WeightModel, rn
    logq = 0.0
    logp = 0.0
    for (pos, label) in enumerate(_columnorder(model, colsums))
-      dlogq, dlogp = _sample_column!(columns[label], res, colsums[label], ws, model, pos, label, rng)
+      dlogq, dlogp, feasible = _sample_column!(columns[label], res, colsums[label], ws, model, pos, label, rng)
+      feasible || return columns, Inf, logp
       logq += dlogq
       logp += dlogp
    end

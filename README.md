@@ -76,17 +76,17 @@ P*(z) ∝ ∏ w[i,j] ^ z[i,j]
 ```
 
 over binary matrices with the given margins. `importance_sampler(m, w)` builds a
-sampler for strictly positive weights `w` (the same size as `m`); each `rand`
-returns an *independent* draw together with the log of its importance weight
-`∏ w^z / Q*(z)`. Reweighting by `exp(logweight)` gives Monte-Carlo estimates: the
-mean weight estimates the normalising constant `κ = Σ_z ∏ w^z`, and a
-weight-weighted average of any statistic estimates its expectation under `P*`.
+sampler for nonnegative weights `w` (the same size as `m`); each `rand` returns an
+*independent* draw together with the log of its importance weight `∏ w^z / Q*(z)`.
+Reweighting by `exp(logweight)` gives Monte-Carlo estimates: the mean weight
+estimates the normalising constant `κ = Σ_z ∏ w^z`, and a weight-weighted average
+of any statistic estimates its expectation under `P*`.
 
 ```julia
 using SparseArrays, RandomBooleanMatrices
 
 m = sprand(Bool, 40, 30, 0.3)
-w = rand(40, 30) .+ 0.5                 # strictly positive weights
+w = rand(40, 30) .+ 0.5                 # nonnegative weights
 sampler = importance_sampler(m, w)
 
 draw = rand(sampler)
@@ -100,9 +100,14 @@ wts    = exp.(getfield.(draws, :logweight))
 Eh     = sum(wts .* h.(getfield.(draws, :matrix))) / sum(wts)   # for some statistic h
 ```
 
-Structural zeros in `w` (forcing entries to zero), weight canonicalisation, and
-the paper's variance-based column ordering are not yet implemented; the importance
-weights are correct regardless, these only affect the sampler's efficiency.
+A zero weight `w[i,j] == 0` is a **structural zero**: it forbids a one at that
+position (useful e.g. for a zero diagonal, the uniform distribution over directed
+graphs). A draw that the zeros leave no way to complete comes back with
+`logweight == -Inf` (importance weight zero) and is simply discarded. The weights
+are also **Sinkhorn-canonicalised** before sampling (pass `canonicalize = false`
+to opt out); this never changes the importance weights, only the sampler's
+variance. The one remaining piece of the paper not yet implemented is its
+variance-based column ordering, which only affects efficiency.
 
 ## References
 

@@ -103,15 +103,13 @@ end
     randomize_matrix!(m, method = exact)
     @test margins(m) == (csm, rsm)
 
-    m2 = rand(0:1, 5, 6)
+    m2 = rand(MersenneTwister(2718), 0:1, 5, 6)
     csm, rsm = margins(m2)
-    rmg = matrixrandomizer(m2, method = exact)   # counts once, reused below
-    m3 = rand(rmg)
-    m4 = rand(rmg)
+    rmg = matrixrandomizer(m2, MersenneTwister(2719), method = exact)   # counts once, reused
+    draws = [rand(rmg) for _ in 1:10]
 
-    @test margins(m3) == (csm, rsm)
-    @test margins(m4) == (csm, rsm)
-    @test m3 != m4
+    @test all(d -> margins(d) == (csm, rsm), draws)
+    @test length(unique(draws)) > 1                    # independent draws vary
 
     # a fully determined problem returns its single solution
     determined = sparse(Bool[1 1 1; 1 1 0; 1 0 0])
@@ -151,7 +149,22 @@ end
     uweights = [exp(rand(uniform).logweight) for _ in 1:50_000]
     @test isapprox(mean(uweights), countmatrices(rs, cs), rtol = 0.02)
 
+    # canonicalisation changes the proposal but not the (unbiased) estimate
+    off = importance_sampler(m0, w, MersenneTwister(11); canonicalize = false)
+    offweights = [exp(rand(off).logweight) for _ in 1:100_000]
+    @test isapprox(mean(offweights), weightedcount(rs, cs, w), rtol = 0.03)
+
+    # structural zeros: a zero weight forbids a one there, and κ is still recovered
+    wz = [0.0 2.0 1.0; 1.5 0.0 2.0; 1.0 0.5 0.0]       # zero diagonal
+    derange = sparse(Bool[0 1 0; 0 0 1; 1 0 0])         # margins (1,1,1), off-diagonal
+    zsampler = importance_sampler(derange, wz, MersenneTwister(3))
+    zdraws = [rand(zsampler) for _ in 1:100_000]
+    @test all(d -> all(i -> !d.matrix[i, i], 1:3), zdraws)   # never a one on a zero
+    zweights = [exp(d.logweight) for d in zdraws]
+    @test isapprox(mean(zweights), weightedcount([1, 1, 1], [1, 1, 1], wz), rtol = 0.05)
+
     # input validation
     @test_throws DimensionMismatch importance_sampler(m0, ones(2, 2))
-    @test_throws ArgumentError importance_sampler(m0, [1.0 0.0 1.0; 1.0 1.0 1.0; 1.0 1.0 1.0])
+    @test_throws ArgumentError importance_sampler(m0, fill(-1.0, 3, 3))   # negative weight
+    @test_throws ArgumentError importance_sampler(m0, zeros(3, 3))        # no positive entry
 end

@@ -132,14 +132,19 @@ distribution over binary matrices with the row and column sums of `m`,
 
     P*(z) ∝ ∏ w[i,j]^z[i,j],
 
-where `w` is a matrix of strictly positive weights the size of `m`; the uniform
-special case is `w` all ones. Each `rand` returns a `(matrix, logweight)` pair: an
+where `w` is a matrix of nonnegative weights the size of `m`; the uniform special
+case is `w` all ones. Each `rand` returns a `(matrix, logweight)` pair: an
 independent draw and the log of its importance weight `∏ w^z / Q*(z)`. Monte-Carlo
 estimates reweight by `exp(logweight)` — for example `mean(exp(logweight))`
 estimates the normalising constant `κ = Σ_z ∏ w^z`, and
 `sum(exp(logweight) .* h) / sum(exp(logweight))` estimates `E[h(Z)]` under P*.
 
-Structural zeros in `w` are not yet supported.
+A zero weight `w[i,j] == 0` is a structural zero: it forbids a one at that
+position. A draw the zeros leave no way to complete is returned with
+`logweight == -Inf` (importance weight zero) and should simply be discarded.
+The proposal is built from the Sinkhorn-canonical form of `w` unless
+`canonicalize = false`; this never changes the importance weights, only the
+sampler's efficiency.
 
 # Examples
 ```
@@ -151,11 +156,12 @@ draw.matrix      # an independent fixed-margin sample
 draw.logweight   # its log importance weight
 ```
 """
-function importance_sampler(m::AbstractMatrix, w::AbstractMatrix, rng = Xoroshiro128Plus())
+function importance_sampler(m::AbstractMatrix, w::AbstractMatrix, rng = Xoroshiro128Plus();
+                            canonicalize::Bool = true)
     size(w) == size(m) || throw(DimensionMismatch("weights `w` must match the size of `m`"))
     sm = SparseMatrixCSC{Bool, Int}(dropzeros!(sparse(m)))
     rowsums, colsums = _margins(sm)
-    WeightedSIS(rowsums, colsums, WeightMatrix(w, rowsums, colsums), rng)
+    WeightedSIS(rowsums, colsums, WeightMatrix(w, rowsums, colsums; canonicalize), rng)
 end
 
 function Random.rand(s::WeightedSIS)
