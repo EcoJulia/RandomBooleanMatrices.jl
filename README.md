@@ -64,9 +64,45 @@ m3 = rand!(rmg)
 
 In short: `curveball` is a sequential Markov chain (correlated draws, uniform in
 the limit), while `exact` and `sis` produce independent draws (exactly uniform,
-resp. close to uniform) on every call. The `sis` proposal is the uniform special
-case of the importance sampler of Harrison & Miller; non-uniform (weighted)
-sampling is a planned extension.
+resp. close to uniform) on every call.
+
+## Weighted (importance) sampling
+
+The `sis` method above is the uniform special case of the importance sampler of
+Harrison & Miller (2013), which targets the weighted distribution
+
+```
+P*(z) ∝ ∏ w[i,j] ^ z[i,j]
+```
+
+over binary matrices with the given margins. `importance_sampler(m, w)` builds a
+sampler for strictly positive weights `w` (the same size as `m`); each `rand`
+returns an *independent* draw together with the log of its importance weight
+`∏ w^z / Q*(z)`. Reweighting by `exp(logweight)` gives Monte-Carlo estimates: the
+mean weight estimates the normalising constant `κ = Σ_z ∏ w^z`, and a
+weight-weighted average of any statistic estimates its expectation under `P*`.
+
+```julia
+using SparseArrays, RandomBooleanMatrices
+
+m = sprand(Bool, 40, 30, 0.3)
+w = rand(40, 30) .+ 0.5                 # strictly positive weights
+sampler = importance_sampler(m, w)
+
+draw = rand(sampler)
+draw.matrix                              # an independent fixed-margin sample
+draw.logweight                           # log( ∏ w^z / Q*(z) )
+
+# estimate κ = Σ_z ∏ w^z and E[h(Z)] under P*
+draws  = [rand(sampler) for _ in 1:1000]
+wts    = exp.(getfield.(draws, :logweight))
+κ̂      = sum(wts) / length(wts)
+Eh     = sum(wts .* h.(getfield.(draws, :matrix))) / sum(wts)   # for some statistic h
+```
+
+Structural zeros in `w` (forcing entries to zero), weight canonicalisation, and
+the paper's variance-based column ordering are not yet implemented; the importance
+weights are correct regardless, these only affect the sampler's efficiency.
 
 ## References
 

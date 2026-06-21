@@ -45,3 +45,24 @@ function _writecols!(m::SparseMatrixCSC{Bool, Int}, columns)
    end
    m
 end
+
+"""
+    _columnsmatrix(columns, nrows)
+
+Assemble a fresh `nrows × length(columns)` sparse boolean matrix from `columns`, a
+per-column vector of row-index lists. Used by samplers that build a matrix from
+scratch rather than overwriting an existing one.
+"""
+function _columnsmatrix(columns, nrows::Int)
+   ncols = length(columns)
+   colptr = Vector{Int}(undef, ncols + 1)
+   colptr[1] = 1
+   @inbounds for j in 1:ncols
+      colptr[j+1] = colptr[j] + length(columns[j])
+   end
+   rowval = Vector{Int}(undef, colptr[end] - 1)
+   @inbounds for j in 1:ncols
+      copyto!(view(rowval, colptr[j]:colptr[j+1]-1), sort!(columns[j]))
+   end
+   SparseMatrixCSC(nrows, ncols, colptr, rowval, fill(true, length(rowval)))
+end

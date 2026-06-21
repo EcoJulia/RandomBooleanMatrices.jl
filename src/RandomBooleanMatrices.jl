@@ -8,6 +8,7 @@ using StatsBase
 include("common.jl")
 include("curveball.jl")
 include("exact.jl")
+include("weights.jl")
 include("sis.jl")
 
 @enum matrixrandomizations curveball exact sis
@@ -106,7 +107,63 @@ _generate!(r::MatrixGenerator{R, SparseMatrixCSC{Bool, Int}}) where R = _draw!(r
 Random.rand(r::MatrixGenerator{R, SparseMatrixCSC{Bool, Int}}) where R = copy(_generate!(r))
 Random.rand!(r::MatrixGenerator{R, SparseMatrixCSC{Bool, Int}}) where R = _generate!(r)
 
-export randomize_matrix!, matrixrandomizer, matrixrandomizations
+"""
+    WeightedSIS
+
+A sequential importance sampler for the weighted fixed-margin target
+P*(z) ∝ ∏ w[i,j]^z[i,j]. Built by [`importance_sampler`](@ref); each `rand` draws
+an independent matrix and returns it with the log of its importance weight.
+"""
+struct WeightedSIS{R<:AbstractRNG}
+    rowsums::Vector{Int}
+    colsums::Vector{Int}
+    model::WeightMatrix
+    rng::R
+end
+
+Base.show(io::IO, s::WeightedSIS) =
+    print(io, "WeightedSIS sampler for a $(length(s.rowsums))×$(length(s.colsums)) fixed-margin matrix")
+
+"""
+    importance_sampler(m, w [,rng])
+
+Create a sequential importance sampler (Harrison & Miller 2013) for the weighted
+distribution over binary matrices with the row and column sums of `m`,
+
+    P*(z) ∝ ∏ w[i,j]^z[i,j],
+
+where `w` is a matrix of strictly positive weights the size of `m`; the uniform
+special case is `w` all ones. Each `rand` returns a `(matrix, logweight)` pair: an
+independent draw and the log of its importance weight `∏ w^z / Q*(z)`. Monte-Carlo
+estimates reweight by `exp(logweight)` — for example `mean(exp(logweight))`
+estimates the normalising constant `κ = Σ_z ∏ w^z`, and
+`sum(exp(logweight) .* h) / sum(exp(logweight))` estimates `E[h(Z)]` under P*.
+
+Structural zeros in `w` are not yet supported.
+
+# Examples
+```
+m = sprand(Bool, 20, 15, 0.3)
+w = rand(20, 15) .+ 0.5
+sampler = importance_sampler(m, w)
+draw = rand(sampler)
+draw.matrix      # an independent fixed-margin sample
+draw.logweight   # its log importance weight
+```
+"""
+function importance_sampler(m::AbstractMatrix, w::AbstractMatrix, rng = Xoroshiro128Plus())
+    size(w) == size(m) || throw(DimensionMismatch("weights `w` must match the size of `m`"))
+    sm = SparseMatrixCSC{Bool, Int}(dropzeros!(sparse(m)))
+    rowsums, colsums = _margins(sm)
+    WeightedSIS(rowsums, colsums, WeightMatrix(w, rowsums, colsums), rng)
+end
+
+function Random.rand(s::WeightedSIS)
+    columns, logq, logp = _sis(s.rowsums, s.colsums, s.model, s.rng)
+    (matrix = _columnsmatrix(columns, length(s.rowsums)), logweight = logp - logq)
+end
+
+export randomize_matrix!, matrixrandomizer, matrixrandomizations, importance_sampler
 export curveball, exact, sis
 
 end

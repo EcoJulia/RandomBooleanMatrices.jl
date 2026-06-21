@@ -3,6 +3,8 @@ using SparseArrays
 using Random
 using Test
 
+mean(x) = sum(x) / length(x)
+
 Random.seed!(1337)
 
 # the row and column sums of a matrix, as plain vectors
@@ -17,6 +19,19 @@ function countmatrices(rowsums, colsums)
         vec(sum(A, dims = 2)) == rowsums && vec(sum(A, dims = 1)) == colsums && (count += 1)
     end
     count
+end
+
+# brute-force weighted count κ = Σ_z ∏ w^z over the binary matrices with the margins
+function weightedcount(rowsums, colsums, w)
+    m, n = length(rowsums), length(colsums)
+    κ = 0.0
+    for bits in 0:(2^(m * n) - 1)
+        A = [(bits >> ((j - 1) * m + (i - 1))) & 1 for i in 1:m, j in 1:n]
+        if vec(sum(A, dims = 2)) == rowsums && vec(sum(A, dims = 1)) == colsums
+            κ += prod(w[i, j]^A[i, j] for i in 1:m, j in 1:n)
+        end
+    end
+    κ
 end
 
 @testset "curveball" begin
@@ -113,4 +128,30 @@ end
     counts = collect(values(Dict(s => count(==(s), samples) for s in unique(samples))))
     @test length(counts) == n                          # full support covered
     @test maximum(counts) < 2 * minimum(counts)        # roughly uniform
+end
+
+@testset "weighted sis" begin
+    m0 = sparse(Bool[1 0 1; 1 1 0; 0 1 0])             # margins (2,2,1) / (2,2,1)
+    cs, rs = margins(m0)
+    w = [1.0 2.0 0.5; 1.5 1.0 2.0; 0.5 1.0 1.0]
+
+    sampler = importance_sampler(m0, w, MersenneTwister(11))
+    draws = [rand(sampler) for _ in 1:100_000]
+
+    # every draw is a fixed-margin matrix
+    @test all(d -> margins(d.matrix) == (cs, rs), draws)
+    @test draws[1].matrix != draws[2].matrix           # independent draws
+
+    # the mean importance weight is an unbiased estimate of the weighted count κ
+    weights = [exp(d.logweight) for d in draws]
+    @test isapprox(mean(weights), weightedcount(rs, cs, w), rtol = 0.03)
+
+    # uniform weights reduce to the plain (unweighted) matrix count
+    uniform = importance_sampler(m0, ones(size(m0)), MersenneTwister(11))
+    uweights = [exp(rand(uniform).logweight) for _ in 1:50_000]
+    @test isapprox(mean(uweights), countmatrices(rs, cs), rtol = 0.02)
+
+    # input validation
+    @test_throws DimensionMismatch importance_sampler(m0, ones(2, 2))
+    @test_throws ArgumentError importance_sampler(m0, [1.0 0.0 1.0; 1.0 1.0 1.0; 1.0 1.0 1.0])
 end

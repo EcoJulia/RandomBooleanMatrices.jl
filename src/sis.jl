@@ -136,13 +136,16 @@ end
 """
     SISWorkspace
 
-Reusable scratch space for sampling one column: the per-row one-probabilities
-`p`, the feasibility band `lo:hi` on the partial column sum after each row, the
-forward transition probabilities `S`, and two rolling buffers for the backward
-dynamic-programming weights.
+Reusable scratch space for sampling one column: the per-row probability `p` of a
+one and the (possibly weighted) `one`-weight that biases it, the feasibility band
+`lo:hi` on the partial column sum after each row, the forward transition
+probabilities `S`, and two rolling buffers for the backward dynamic-programming
+weights. For the uniform target `one == p`; a weight model scales `one` by its
+per-row factor while leaving the zero-weight `1 - p` alone.
 """
 struct SISWorkspace
    p::Vector{Float64}
+   one::Vector{Float64}
    lo::Vector{Int}
    hi::Vector{Int}
    S::Matrix{Float64}
@@ -151,14 +154,29 @@ struct SISWorkspace
 end
 
 SISWorkspace(nrows::Int, maxcol::Int) =
-   SISWorkspace(Vector{Float64}(undef, nrows), Vector{Int}(undef, nrows),
-                Vector{Int}(undef, nrows), Matrix{Float64}(undef, maxcol + 1, nrows),
+   SISWorkspace(Vector{Float64}(undef, nrows), Vector{Float64}(undef, nrows),
+                Vector{Int}(undef, nrows), Vector{Int}(undef, nrows),
+                Matrix{Float64}(undef, maxcol + 1, nrows),
                 Vector{Float64}(undef, maxcol + 2), Vector{Float64}(undef, maxcol + 2))
 
-# Score every row for the current column.
-function _score!(ws::SISWorkspace, res::SISResidual, scorer::ColumnScorer)
+# Score every row for the current column: `p` is the combinatorial probability of
+# a one, and `one` is that probability scaled by the weight model's factor (so the
+# odds of a one become p·v : 1-p). A weight factor of `Inf` flags a row the
+# remaining weights force to a one, which we encode as p = 1.
+function _score!(ws::SISWorkspace, res::SISResidual, scorer::ColumnScorer,
+                 model::WeightModel, pos::Int)
    @inbounds for i in 1:res.nrows
-      ws.p[i] = scorer(res.residual[res.order[i]])
+      row = res.order[i]
+      ρ = res.residual[row]
+      p = scorer(ρ)
+      v = _weightfactor(model, row, ρ, res.ncols, pos)
+      if isinf(v)
+         ws.p[i] = 1.0
+         ws.one[i] = 1.0
+      else
+         ws.p[i] = p
+         ws.one[i] = p * v
+      end
    end
    ws
 end
@@ -197,14 +215,15 @@ function _transitions!(ws::SISWorkspace, k::Int)
    @inbounds for i in m:-1:1
       lo = i == 1 ? 0 : ws.lo[i-1]        # band on the partial sum before row i
       hi = i == 1 ? 0 : ws.hi[i-1]
-      p = ws.p[i]
+      one = ws.one[i]                     # weight of a one (odds one : zero = one : 1-p)
+      zero = 1 - ws.p[i]                  # weight of a zero
       for t in locur:hicur               # clear only gcur's stale band
          gcur[t] = 0.0
       end
       total = 0.0
       for s in lo:hi
-         w1 = p * gnext[s+2]             # row i is a one  -> partial sum s+1
-         w0 = (1 - p) * gnext[s+1]       # row i is a zero -> partial sum s
+         w1 = one * gnext[s+2]           # row i is a one  -> partial sum s+1
+         w0 = zero * gnext[s+1]          # row i is a zero -> partial sum s
          weight = w0 + w1
          gcur[s+1] = weight
          S[s+1, i] = weight > 0 ? w1 / weight : 0.0
@@ -223,40 +242,46 @@ function _transitions!(ws::SISWorkspace, k::Int)
    ws
 end
 
-# Forward pass: walk the rows, drawing each from its transition probability, and
-# accumulate the log-probability of the column under the proposal.
-function _draw_column!(rows, ws::SISWorkspace, order, k::Int, rng)
+# Forward pass: walk the rows, drawing each from its transition probability.
+# Accumulate the log proposal probability `logq` of the column and, for a weighted
+# target, the log target weight `logp = Σ log w` over the ones placed.
+function _draw_column!(rows, ws::SISWorkspace, order, k::Int, model::WeightModel, label::Int, rng)
    s = 0
    logq = 0.0
+   logp = 0.0
    @inbounds for i in eachindex(ws.p)
       p = ws.S[s+1, i]
       if rand(rng) < p
-         push!(rows, order[i])
+         row = order[i]
+         push!(rows, row)
          s += 1
          logq += log(p)
+         logp += _logweight(model, row, label)
          s == k && break
       else
          logq += log(1 - p)
       end
    end
-   logq
+   logq, logp
 end
 
 """
-    _sample_column!(rows, res, k, ws, rng)
+    _sample_column!(rows, res, k, ws, model, pos, label, rng)
 
-Sample one column of total `k` into `rows` (original row indices), update the
-residual problem, and return the log proposal probability of the draw.
+Sample the column with label `label` (at sampling position `pos`) and total `k`
+into `rows` (original row indices), update the residual problem, and return the
+log proposal probability and log target weight `(logq, logp)` of the draw.
 """
-function _sample_column!(rows, res::SISResidual, k::Int, ws::SISWorkspace, rng)
-   k == 0 && return 0.0
+function _sample_column!(rows, res::SISResidual, k::Int, ws::SISWorkspace,
+                         model::WeightModel, pos::Int, label::Int, rng)
+   k == 0 && return 0.0, 0.0
    _advance!(res, k)
-   _score!(ws, res, Canfield(res.nrows, res.ncols, res.total, res.sumsq))
+   _score!(ws, res, Canfield(res.nrows, res.ncols, res.total, res.sumsq), model, pos)
    _band!(ws, res, k)
    _transitions!(ws, k)
-   logq = _draw_column!(rows, ws, res.order, k, rng)
+   logq, logp = _draw_column!(rows, ws, res.order, k, model, label, rng)
    _place!(res, rows)
-   logq
+   logq, logp
 end
 
 # ---------------------------------------------------------------------------
@@ -264,27 +289,35 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    _sis(rowsums, colsums, rng)
+    _sis(rowsums, colsums, model, rng)
 
-Sample a fixed-margin binary matrix by sequential importance sampling, returning
-the row indices of each column together with the log proposal probability of the
-whole matrix. Columns are visited in order of decreasing sum, which the authors
-find improves the approximation.
+Sample a fixed-margin binary matrix by sequential importance sampling under the
+target described by `model` (uniform, or a [`WeightMatrix`]). Returns the row
+indices of each column with the log proposal probability `logq` and log target
+weight `logp` of the whole matrix; the importance weight of the draw is
+`exp(logp - logq)`. Columns are visited in the order the model prescribes (by
+decreasing sum), which the authors find improves the approximation.
 """
-function _sis(rowsums::Vector{Int}, colsums::Vector{Int}, rng)
+function _sis(rowsums::Vector{Int}, colsums::Vector{Int}, model::WeightModel, rng)
    res = SISResidual(rowsums, colsums)
    ws = SISWorkspace(res.nrows, maximum(colsums, init = 0))
    columns = [Int[] for _ in colsums]
    logq = 0.0
-   for j in sortperm(colsums, rev = true)
-      logq += _sample_column!(columns[j], res, colsums[j], ws, rng)
+   logp = 0.0
+   for (pos, label) in enumerate(_columnorder(model, colsums))
+      dlogq, dlogp = _sample_column!(columns[label], res, colsums[label], ws, model, pos, label, rng)
+      logq += dlogq
+      logp += dlogp
    end
-   columns, logq
+   columns, logq, logp
 end
+
+_sis(rowsums::Vector{Int}, colsums::Vector{Int}, rng) =
+   _sis(rowsums, colsums, UniformWeights(), rng)
 
 function _sis!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG)
    rowsums, colsums = _margins(m)
-   columns, _ = _sis(rowsums, colsums, rng)
+   columns, _, _ = _sis(rowsums, colsums, UniformWeights(), rng)
    _writecols!(m, columns)
 end
 
