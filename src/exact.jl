@@ -237,3 +237,11 @@ function _exact!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG)
    _exact_sample!(columns, _exact_counts(rowsums, colsums), rng)
    _writecols!(m, columns)
 end
+
+# Generator draw: the cached `ExactCounts` is the generator state, so repeated
+# draws reuse the (expensive) count instead of recomputing it.
+function _draw!(m::SparseMatrixCSC{Bool, Int}, rng, ex::ExactCounts)
+   columns = [Int[] for _ in 1:size(m, 2)]
+   _exact_sample!(columns, ex, rng)
+   _writecols!(m, columns)
+end

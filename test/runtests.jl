@@ -42,6 +42,15 @@ end
     m4 = rand(rmg)
 
     @test m3 != m4
+
+    # the trade count is controllable; zero trades leaves the matrix untouched
+    m5 = sprand(Bool, 8, 6, 0.3)
+    @test randomize_matrix!(copy(m5), method = curveball, trades = 0) == m5
+    @test matrixrandomizer(m5, method = curveball, trades = 7).state.trades == 7
+
+    # the generator warm-starts from an independent draw and preserves margins
+    csm5, rsm5 = margins(m5)
+    @test margins(rand(matrixrandomizer(m5, method = curveball, trades = 10))) == (csm5, rsm5)
 end
 
 @testset "sis" begin

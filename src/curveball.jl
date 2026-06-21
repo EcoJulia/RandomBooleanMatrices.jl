@@ -53,13 +53,13 @@ function _interdif!(v1, v2, inter, dif)
    ndiff, nshared
 end
 
-function _curveball!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG)
+function _curveball!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG, trades::Int = 5 * size(m, 2))
    R, C = size(m)
    mcs = min(2maximum(diff(m.colptr)), size(m, 1))
    not_shared, shared = Vector{Int}(undef, mcs), Vector{Int}(undef, mcs)
    newa, newb = Vector{Int}(undef, mcs), Vector{Int}(undef, mcs)
 
-   for rep ∈ 1:5C
+   for rep ∈ 1:trades
 	   A, B = rand(rng, 1:C,2)
 
       # use views directly into the sparse matrix to avoid copying
@@ -82,3 +82,18 @@ function _curveball!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG)
 
    return m
 end
+
+"""
+    CurveballSampler(trades)
+
+Generator state for the curveball method: each draw advances the stored matrix by
+`trades` curveball trades. The matrix is itself a running Markov chain, so the
+generator warm-starts it from an independent SIS draw (see `matrixrandomizer`) to
+decorrelate the first sample from the input, and `trades` controls how far the
+chain moves between successive draws (thinning).
+"""
+struct CurveballSampler
+   trades::Int
+end
+
+_draw!(m::SparseMatrixCSC{Bool, Int}, rng, s::CurveballSampler) = _curveball!(m, rng, s.trades)

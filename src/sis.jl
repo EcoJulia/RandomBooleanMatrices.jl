@@ -287,3 +287,14 @@ function _sis!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG)
    columns, _ = _sis(rowsums, colsums, rng)
    _writecols!(m, columns)
 end
+
+"""
+    SISSampler()
+
+Generator state for the SIS method. SIS draws are independent, so the generator
+keeps no precomputed state — each draw resamples the stored matrix from its
+margins.
+"""
+struct SISSampler end
+
+_draw!(m::SparseMatrixCSC{Bool, Int}, rng, ::SISSampler) = _sis!(m, rng)

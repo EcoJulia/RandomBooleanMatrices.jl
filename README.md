@@ -31,6 +31,10 @@ rmg = matrixrandomizer(m, method = sis)
 m1 = rand(rmg) # creates a new random matrix
 m2 = rand(rmg)
 
+# the curveball generator is warm-started from an independent draw, and `trades`
+# sets how many trades separate successive samples (raise it to thin correlation)
+rmg = matrixrandomizer(m, method = curveball, trades = 10_000)
+
 # You can also avoid copying by
 m3 = rand!(rmg)
 # but notice that this will not create a new copy of the Matrix, so generating multiple matrices at once with this is impossible
@@ -40,10 +44,13 @@ m3 = rand!(rmg)
 
   * `curveball` (default) — the curveball algorithm of Strona et al. (2014). A
     fast in-place trade that performs a Markov step from the current matrix. It is
-    **sequential**: each call modifies the matrix in place and continues the chain
-    from where the previous call left off, so successive draws are *correlated*.
-    The chain's stationary distribution is the uniform one, so over a long run
-    (with a little burn-in / thinning) it samples fixed-margin matrices uniformly.
+    **sequential**: each call continues the chain from where the previous one left
+    off, so successive draws are *correlated*. The chain's stationary distribution
+    is the uniform one, so over a run it samples fixed-margin matrices uniformly.
+    The `matrixrandomizer` generator warm-starts the chain from an independent
+    `sis` draw, so even the first sample is decorrelated from the input matrix, and
+    the `trades` keyword sets how many trades separate successive draws — raise it
+    to thin out the correlation between samples.
   * `sis` — sequential importance sampling (Harrison & Miller 2013). Each call
     draws an **independent** matrix from a fast, near-uniform approximation of the
     fixed-margin distribution. Scales to large matrices and is the natural choice
