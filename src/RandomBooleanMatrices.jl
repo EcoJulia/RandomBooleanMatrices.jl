@@ -49,7 +49,7 @@ struct MatrixGenerator{R<:AbstractRNG, M}
     state::GeneratorState
 end
 
-show(io::IO, m::MatrixGenerator{R, SparseMatrixCSC{Bool, Int}}) where R = println(io, "Boolean MatrixGenerator with size $(size(m.m)) and $(nnz(m.m)) occurrences")
+Base.show(io::IO, m::MatrixGenerator{R, SparseMatrixCSC{Bool, Int}}) where R = print(io, "Boolean MatrixGenerator with size $(size(m.m)) and $(nnz(m.m)) occurrences")
 
 # Build the sampler for `method`, performing any one-off preparation of `sm`:
 # `exact` caches its (expensive) matrix count, and `curveball` warm-starts the
