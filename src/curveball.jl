@@ -53,14 +53,25 @@ function _interdif!(v1, v2, inter, dif)
    ndiff, nshared
 end
 
-function _curveball!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG, trades::Int = 5 * size(m, 2))
-   R, C = size(m)
+# The columns that can take part in a trade. A pair involving an empty column is a
+# no-op and column sums never change, so this set is fixed along the chain; drawing
+# pairs only from it leaves the target distribution unchanged, and stops a sparse
+# matrix with many empty columns from spending nearly all its trades on nothing.
+_tradingcolumns(m::SparseMatrixCSC) = findall(>(0), diff(SparseArrays.getcolptr(m)))
+
+# The default number of trades per call: five per column that can trade.
+_defaulttrades(m::SparseMatrixCSC) = 5 * length(_tradingcolumns(m))
+
+function _curveball!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG, trades::Int = _defaulttrades(m))
+   cols = _tradingcolumns(m)
+   C = length(cols)
+   C < 2 && return m
    mcs = min(2maximum(diff(m.colptr)), size(m, 1))
    not_shared, shared = Vector{Int}(undef, mcs), Vector{Int}(undef, mcs)
    newa, newb = Vector{Int}(undef, mcs), Vector{Int}(undef, mcs)
 
    for rep ∈ 1:trades
-	   A, B = rand(rng, 1:C,2)
+	   A, B = cols[rand(rng, 1:C)], cols[rand(rng, 1:C)]
 
       # use views directly into the sparse matrix to avoid copying
 	   a, b = view(m.rowval, m.colptr[A]:m.colptr[A+1]-1), view(m.rowval, m.colptr[B]:m.colptr[B+1]-1)

@@ -66,6 +66,25 @@ end
     # the generator warm-starts from an independent draw and preserves margins
     csm5, rsm5 = margins(m5)
     @test margins(rand(matrixrandomizer(m5, method = curveball, trades = 10))) == (csm5, rsm5)
+
+    # a sparse matrix with many empty columns still mixes: trades are drawn among
+    # the non-empty columns, so the empty ones do not use them up
+    sp = spzeros(Bool, 6, 20_000)
+    for (k, j) in enumerate(randperm(MersenneTwister(5), 20_000)[1:60])
+        sp[mod1(k, 6), j] = true
+        sp[mod1(k + 2, 6), j] = true
+    end
+    @test matrixrandomizer(sp, method = curveball).state.trades == 5 * 60
+    spcsm, sprsm = margins(sp)
+    rmg = matrixrandomizer(sp, MersenneTwister(6), method = curveball)
+    draws = [rand(rmg) for _ in 1:20]
+    @test all(d -> margins(d) == (spcsm, sprsm), draws)
+    @test minimum(i -> count(draws[i] .& .!draws[i + 1]), 1:19) >= 10
+
+    # with fewer than two non-empty columns nothing can trade
+    single = spzeros(Bool, 4, 50)
+    single[2, 7] = true
+    @test randomize_matrix!(copy(single), method = curveball) == single
 end
 
 @testset "sis" begin

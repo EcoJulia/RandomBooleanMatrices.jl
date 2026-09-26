@@ -51,6 +51,9 @@ m3 = rand!(rmg)
     `sis` draw, so even the first sample is decorrelated from the input matrix, and
     the `trades` keyword sets how many trades separate successive draws — raise it
     to thin out the correlation between samples.
+    Trades are drawn among the non-empty columns only (empty columns can never
+    trade), and `trades` defaults to five per non-empty column, so matrices with
+    many empty columns mix as fast as the same matrix without them.
   * `sis` — sequential importance sampling (Harrison & Miller 2013). Each call
     draws an **independent** matrix from a fast, near-uniform approximation of the
     fixed-margin distribution. Scales to large matrices and is the natural choice
