@@ -14,7 +14,7 @@ include("sis.jl")
 @enum matrixrandomizations curveball exact sis
 
 """
-    randomize_matrix!(m [,rng]; method = curveball, trades = 5 * size(m, 2))
+    randomize_matrix!(m [,rng]; method = curveball, trades)
 
 Randomize the sparse boolean Matrix `m` in place while maintaining its row and
 column sums. The algorithm is chosen with `method`:
@@ -30,9 +30,12 @@ column sums. The algorithm is chosen with `method`:
     step is repeated on every call, so prefer [`matrixrandomizer`](@ref), which
     counts once and reuses the result.
 
-`trades` applies only to `curveball` and sets how far the chain moves per call.
+`trades` applies only to `curveball` and sets how far the chain moves per call. It
+defaults to five per non-empty column: empty columns can never trade, so trades
+are drawn among the non-empty columns only, and a sparse matrix with many empty
+columns mixes as fast as the same matrix without them.
 """
-function randomize_matrix!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG; method::matrixrandomizations = curveball, trades::Int = 5 * size(m, 2))
+function randomize_matrix!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG; method::matrixrandomizations = curveball, trades::Int = _defaulttrades(m))
     method == curveball && return _curveball!(m, rng, trades)
     method == sis       && return _sis!(m, rng)
     method == exact     && return _exact!(m, rng)
@@ -61,13 +64,13 @@ function _sampler!(method::matrixrandomizations, sm::SparseMatrixCSC{Bool, Int},
     method == exact && return _exact_counts(_margins(sm)...)
     if method == curveball
         _sis!(sm, rng)
-        return CurveballSampler(something(trades, 5 * size(sm, 2)))
+        return CurveballSampler(something(trades, _defaulttrades(sm)))
     end
     error("undefined method")
 end
 
 """
-    matrixrandomizer(m [,rng]; method = curveball, trades = 5 * size(m, 2))
+    matrixrandomizer(m [,rng]; method = curveball, trades)
 
 Create a matrix generator that returns a random boolean matrix every time it is
 called, maintaining row and column sums. Non-boolean input matrices are
@@ -78,7 +81,8 @@ For `method = exact` the matrix count is computed once here and reused by every
 draw. For `method = curveball` the chain is warm-started from an independent `sis`
 draw, so even the first sample is decorrelated from `m`; `trades` then sets how
 many curveball trades separate successive draws — raise it to reduce correlation
-between samples.
+between samples. It defaults to five per non-empty column, as for
+[`randomize_matrix!`](@ref).
 
 # Examples
 ```
