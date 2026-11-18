@@ -62,16 +62,17 @@ _tradingcolumns(m::SparseMatrixCSC) = findall(>(0), diff(SparseArrays.getcolptr(
 # The default number of trades per call: five per column that can trade.
 _defaulttrades(m::SparseMatrixCSC) = 5 * length(_tradingcolumns(m))
 
-function _curveball!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG, trades::Int = _defaulttrades(m))
-   cols = _tradingcolumns(m)
+function _curveball!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG, trades::Int = _defaulttrades(m), cols = _tradingcolumns(m))
    C = length(cols)
    C < 2 && return m
-   mcs = min(2maximum(diff(m.colptr)), size(m, 1))
+   mcs = min(2maximum(j -> m.colptr[j+1] - m.colptr[j], cols), size(m, 1))
    not_shared, shared = Vector{Int}(undef, mcs), Vector{Int}(undef, mcs)
    newa, newb = Vector{Int}(undef, mcs), Vector{Int}(undef, mcs)
 
    for rep ∈ 1:trades
-	   A, B = cols[rand(rng, 1:C)], cols[rand(rng, 1:C)]
+      # a random pair of distinct columns
+	   i, j = rand(rng, 1:C), rand(rng, 1:C-1)
+	   A, B = cols[i], cols[j + (j >= i)]
 
       # use views directly into the sparse matrix to avoid copying
 	   a, b = view(m.rowval, m.colptr[A]:m.colptr[A+1]-1), view(m.rowval, m.colptr[B]:m.colptr[B+1]-1)
@@ -95,16 +96,18 @@ function _curveball!(m::SparseMatrixCSC{Bool, Int}, rng = Random.GLOBAL_RNG, tra
 end
 
 """
-    CurveballSampler(trades)
+    CurveballSampler(trades, cols)
 
 Generator state for the curveball method: each draw advances the stored matrix by
-`trades` curveball trades. The matrix is itself a running Markov chain, so the
+`trades` curveball trades among `cols`, the columns that can trade (fixed along the
+chain, so found once). The matrix is itself a running Markov chain, so the
 generator warm-starts it from an independent SIS draw (see `matrixrandomizer`) to
 decorrelate the first sample from the input, and `trades` controls how far the
 chain moves between successive draws (thinning).
 """
 struct CurveballSampler
    trades::Int
+   cols::Vector{Int}
 end
 
-_draw!(m::SparseMatrixCSC{Bool, Int}, rng, s::CurveballSampler) = _curveball!(m, rng, s.trades)
+_draw!(m::SparseMatrixCSC{Bool, Int}, rng, s::CurveballSampler) = _curveball!(m, rng, s.trades, s.cols)

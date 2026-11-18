@@ -64,7 +64,7 @@ function _sampler!(method::matrixrandomizations, sm::SparseMatrixCSC{Bool, Int},
     method == exact && return _exact_counts(_margins(sm)...)
     if method == curveball
         _sis!(sm, rng)
-        return CurveballSampler(something(trades, _defaulttrades(sm)))
+        return CurveballSampler(something(trades, _defaulttrades(sm)), _tradingcolumns(sm))
     end
     error("undefined method")
 end
